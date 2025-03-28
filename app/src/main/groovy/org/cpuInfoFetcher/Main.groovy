@@ -4,6 +4,7 @@ import java.nio.file.Files
 import java.util.logging.Logger
 import java.nio.file.Paths
 import org.dflib.DataFrame
+import org.dflib.Printers
 import org.dflib.JoinType
 import org.dflib.csv.Csv
 
@@ -35,9 +36,11 @@ class Main {
             'tdp', 'thermal design power', 'Thermal Design Power (TDP)',
         ],
         'cores': ['Total Cores', '# of CPU Cores', 'cores'],
-        'threads': ['cores', 'Total Cores', '# of CPU Cores', 'Total Threads', '# of Threads', 'threads'],
-        'Launch Year/Last Time Buy': ['Launch Year/Last Time Buy'],
+        'threads': ['cores', 'Total Cores', '# of CPU Cores', 'Total Threads', '# of Threads', 'threads']
     ]
+
+    static Map<String, List<String>> specification_aliases_retain_null_entries = ['name': ['name'], "Launch Year/Last Time Buy": ["Launch Year/Last Time Buy"]]
+
     // Mapping units to columns
     static Map<String, List<String>> units_mapping = ['tdp': ['W', 'Watt']]
 
@@ -102,11 +105,26 @@ class Main {
 
         // Selecting relevant information
         CPUSpecificationsSummarizer summarizer = new CPUSpecificationsSummarizer()
-        DataFrame selected_specifications = summarizer.extract_selection(
-            specifications,
+
+        selected_specifications = summarizer.extract_selection(
+                specifications,
             this.specification_aliases,
             true
         )
+
+        // Add "Launch Year/Last Time Buy" column
+        DataFrame columns_to_add = summarizer.extract_selection(
+                specifications,
+                this.specification_aliases_retain_null_entries,
+                false
+        )
+
+        // Perform Left Join (keeping all rows of selected_specifications)
+        def selected_specifications = selected_specifications.join(columns_to_add)
+                .on("name")
+                .colsExcept(c -> c.endsWith("_"))
+                .select()
+
         LOGGER.info('Extracted information.')
 
         UnitsAdapter ua = new UnitsAdapter()
@@ -119,9 +137,6 @@ class Main {
         // add default TDPs
         selected_specifications = ProcessSpecificationsTable.computeDefaultTdps(selected_specifications)
         LOGGER.info('Added default TDP values.')
-
-        // remove year column as it was just temporary added to compute default TDPs
-        selected_specifications = selected_specifications.colsExcept('Launch Year/Last Time Buy').select();
 
         Csv.save(selected_specifications, Paths.get('..', 'specifications_out', 'specifications_filtered.csv'))
         Csv.save(selected_specifications, Paths.get('..', 'nf-co2footprint', 'CPU_TDP.csv'))

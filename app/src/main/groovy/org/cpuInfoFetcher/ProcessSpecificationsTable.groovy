@@ -157,7 +157,7 @@ static DataFrame extractUniformYearColumn(DataFrame df) {
     // Match and parse specific patterns
     def extractYear = { value ->
         if (value == null || value.toString().trim().isEmpty()) {
-            return -1 // Handle null or empty input
+            return null // Handle null or empty input
         }
 
         value = value.toString().trim() // Ensure the value is a trimmed string
